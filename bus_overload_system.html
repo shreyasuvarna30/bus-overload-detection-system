@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BODS — Bus Overload Detection System</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* ═══════════════════════════════════════════
+   ROOT & RESET
+═══════════════════════════════════════════ */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased}
+:root{
+  --bg:#05080f;
+  --g1:#090d1a;--g2:#0d1221;--g3:#111829;
+  --card:#0f1520;--card2:#141c2e;
+  --bdr:#1c2a42;--bdr2:#243352;
+  --teal:#0ff4c6;--blue:#3d8eff;--red:#ff3358;
+  --amber:#ffaa00;--green:#22d67a;--purple:#b06eff;
+  --txt:#cdd8ef;--muted:#4a5f80;--dim:#2a3d5c;
+  --sans:'Outfit',sans-serif;--mono:'JetBrains Mono',monospace;
+  --glow-teal:0 0 20px rgba(15,244,198,.25);
+  --glow-red:0 0 20px rgba(255,51,88,.3);
+  --glow-amber:0 0 20px rgba(255,170,0,.25);
+  --r:8px;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg)}
+body{display:flex;flex-direction:column;font-family:var(--sans);color:var(--txt);font-size:14px}
+
+/* ═══════════════════════════════════════════
+   SCROLLBARS
+═══════════════════════════════════════════ */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:var(--g1)}
+::-webkit-scrollbar-thumb{background:var(--bdr2);border-radius:2px}
+
+/* ═══════════════════════════════════════════
+   HEADER
+═══════════════════════════════════════════ */
+header{
+  background:linear-gradient(90deg,var(--g1) 0%,var(--g2) 100%);
+  border-bottom:1px solid var(--bdr);
+  padding:0 24px;height:58px;
+  display:flex;align-items:center;gap:18px;
+  flex-shrink:0;position:relative;overflow:hidden;
+}
+header::before{
+  content:'';position:absolute;top:0;left:0;right:0;bottom:0;
+  background:linear-gradient(90deg,rgba(15,244,198,.04) 0%,transparent 50%);
+  pointer-events:none;
+}
+.hdr-logo{display:flex;align-items:center;gap:12px}
+.hdr-chip{
+  background:var(--teal);color:#000;
+  font-family:var(--mono);font-size:11px;font-weight:600;
+  padding:4px 10px;border-radius:4px;letter-spacing:1.5px;
+}
+.hdr-titles .main{font-size:15px;font-weight:700;letter-spacing:1px;color:#fff}
+.hdr-titles .sub{font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:1px}
+.hdr-center{display:flex;align-items:center;gap:24px;margin:0 auto}
+.hdr-stat{text-align:center}
+.hdr-stat .v{font-family:var(--mono);font-size:18px;font-weight:600;color:#fff}
+.hdr-stat .l{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-top:1px}
+.hdr-divider{width:1px;height:32px;background:var(--bdr)}
+.hdr-right{display:flex;align-items:center;gap:10px}
+.live-indicator{display:flex;align-items:center;gap:7px;padding:5px 12px;background:rgba(15,244,198,.06);border:1px solid rgba(15,244,198,.15);border-radius:20px}
+.pip{width:7px;height:7px;border-radius:50%;background:var(--muted);transition:background .3s}
+.pip.live{background:var(--green);animation:pipAnim 1.8s infinite}
+@keyframes pipAnim{0%,100%{box-shadow:0 0 0 0 rgba(34,214,122,.5)}50%{box-shadow:0 0 0 6px rgba(34,214,122,0)}}
+.live-text{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--muted);letter-spacing:1px}
+.live-text.on{color:var(--green)}
+.clock{font-family:var(--mono);font-size:13px;color:var(--txt);min-width:76px;text-align:center}
+.btn{
+  font-family:var(--mono);font-size:11px;font-weight:600;
+  padding:8px 18px;border-radius:6px;border:1px solid;
+  cursor:pointer;letter-spacing:1px;transition:all .2s;
+  text-transform:uppercase;background:transparent;
+}
+.btn-start{border-color:var(--teal);color:var(--teal)}
+.btn-start:hover{background:rgba(15,244,198,.12);box-shadow:var(--glow-teal)}
+.btn-pause{border-color:var(--amber);color:var(--amber)}
+.btn-pause:hover{background:rgba(255,170,0,.12);box-shadow:var(--glow-amber)}
+.btn-reset{border-color:var(--dim);color:var(--muted)}
+.btn-reset:hover{background:rgba(42,61,92,.3);border-color:var(--bdr2)}
+
+/* ═══════════════════════════════════════════
+   TABS
+═══════════════════════════════════════════ */
+nav.tabs{
+  background:var(--g1);border-bottom:1px solid var(--bdr);
+  display:flex;padding:0 24px;flex-shrink:0;gap:4px;
+}
+.tab{
+  font-family:var(--mono);font-size:10px;font-weight:600;
+  padding:12px 20px;cursor:pointer;
+  border-bottom:2px solid transparent;
+  color:var(--muted);transition:.2s;letter-spacing:1.5px;
+  text-transform:uppercase;display:flex;align-items:center;gap:7px;
+}
+.tab svg{width:12px;height:12px;fill:currentColor;opacity:.7}
+.tab.active{color:var(--teal);border-color:var(--teal)}
+.tab:hover:not(.active){color:var(--txt)}
+.pane{display:none;flex:1;overflow:hidden;min-height:0}
+.pane.active{display:flex;flex-direction:column}
+
+/* ═══════════════════════════════════════════
+   SHARED CARD
+═══════════════════════════════════════════ */
+.card{
+  background:var(--card);border:1px solid var(--bdr);
+  border-radius:var(--r);overflow:hidden;
+  display:flex;flex-direction:column;
+}
+.card-hdr{
+  padding:11px 16px;border-bottom:1px solid var(--bdr);
+  font-family:var(--mono);font-size:9px;font-weight:600;
+  color:var(--teal);letter-spacing:2px;text-transform:uppercase;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.card-hdr .tag{color:var(--muted);font-weight:400}
+.card-body{overflow-y:auto;flex:1;min-height:0}
+
+/* ═══════════════════════════════════════════
+   DASHBOARD TAB
+═══════════════════════════════════════════ */
+.dash-wrap{
+  display:grid;
+  grid-template-rows:auto 1fr;
+  flex:1;overflow:hidden;gap:12px;
+  padding:14px 20px;min-height:0;
+}
+.kpi-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.kpi-card{
+  background:var(--card);border:1px solid var(--bdr);
+  border-radius:var(--r);padding:14px 16px;
+  position:relative;overflow:hidden;
+  transition:border-color .3s,box-shadow .3s;
+}
+.kpi-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  border-radius:var(--r) var(--r) 0 0;
+}
+.kpi-card.teal::before{background:linear-gradient(90deg,var(--teal),transparent)}
+.kpi-card.red::before{background:linear-gradient(90deg,var(--red),transparent)}
+.kpi-card.green::before{background:linear-gradient(90deg,var(--green),transparent)}
+.kpi-card.amber::before{background:linear-gradient(90deg,var(--amber),transparent)}
+.kpi-card.blue::before{background:linear-gradient(90deg,var(--blue),transparent)}
+.kpi-l{font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);font-family:var(--mono);margin-bottom:8px}
+.kpi-v{font-family:var(--mono);font-size:26px;font-weight:700;color:#fff;line-height:1;transition:color .4s}
+.kpi-s{font-size:10px;color:var(--muted);margin-top:5px}
+.kpi-icon{position:absolute;right:14px;top:14px;font-size:22px;opacity:.15}
+
+.dash-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr 300px;
+  grid-template-rows:1fr 1fr;
+  gap:12px;min-height:0;overflow:hidden;
+}
+.dash-routes{grid-row:1/3}
+.dash-chart{grid-row:1/2}
+.dash-alerts{grid-row:2/3}
+.dash-log{grid-row:1/3}
+
+/* Route Rows */
+.r-row{
+  padding:11px 16px;border-bottom:1px solid var(--bdr);
+  display:grid;grid-template-columns:90px 1fr 60px 90px;
+  gap:10px;align-items:center;transition:background .2s;
+}
+.r-row:last-child{border-bottom:none}
+.r-row.over{background:rgba(255,51,88,.04)}
+.r-row:hover{background:var(--card2)}
+.r-id{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--txt)}
+.r-type{font-size:8px;text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+.r-type.ksrtc{color:var(--blue)} .r-type.express{color:var(--amber)} .r-type.local{color:var(--green)}
+.bar-bg{background:var(--bdr);border-radius:3px;height:5px;overflow:hidden;margin:5px 0}
+.bar-fg{height:5px;border-radius:3px;transition:width .9s ease,background .3s}
+.r-info{font-size:9px;color:var(--muted);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.r-pct{font-family:var(--mono);font-size:12px;font-weight:600;text-align:right}
+.badge{font-size:8px;padding:3px 8px;border-radius:20px;font-family:var(--mono);font-weight:600;text-align:center}
+.b-ok{background:rgba(34,214,122,.1);color:var(--green);border:1px solid rgba(34,214,122,.25)}
+.b-warn{background:rgba(255,170,0,.1);color:var(--amber);border:1px solid rgba(255,170,0,.25)}
+.b-over{background:rgba(255,51,88,.12);color:var(--red);border:1px solid rgba(255,51,88,.3);animation:blink .9s infinite}
+.b-stop{background:rgba(176,110,255,.12);color:var(--purple);border:1px solid rgba(176,110,255,.3)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+.dwell-bar{height:3px;background:rgba(176,110,255,.15);border-radius:2px;overflow:hidden;margin-top:3px}
+.dwell-fill{height:3px;background:var(--purple);border-radius:2px;transition:width .3s linear}
+
+/* Chart */
+.chart-inner{padding:12px 14px;flex:1;position:relative;min-height:0}
+
+/* Alert / Log items */
+.a-item{
+  padding:10px 14px;border-bottom:1px solid var(--bdr);
+  display:flex;gap:9px;align-items:flex-start;
+  animation:slideIn .3s ease;
+}
+.a-item:last-child{border-bottom:none}
+@keyframes slideIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+.a-dot{width:6px;height:6px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.a-msg{font-size:11px;line-height:1.55;color:var(--txt)}
+.a-ts{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:2px}
+.log-row{
+  padding:6px 14px;border-bottom:1px solid rgba(28,42,66,.6);
+  display:flex;align-items:center;gap:6px;
+  animation:slideIn .25s ease;
+}
+.l-ts{font-family:var(--mono);font-size:9px;color:var(--muted);min-width:38px}
+.l-type{font-family:var(--mono);font-size:8px;min-width:46px}
+.l-pax{font-family:var(--mono);font-size:9px;min-width:38px;color:var(--txt)}
+.l-stop{font-size:9px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.l-badge{font-size:8px;padding:2px 5px;border-radius:3px;font-family:var(--mono);font-weight:600}
+.lb-o{background:rgba(255,51,88,.12);color:var(--red)}
+.lb-w{background:rgba(255,170,0,.1);color:var(--amber)}
+.lb-n{background:rgba(34,214,122,.08);color:var(--green)}
+
+/* ═══════════════════════════════════════════
+   MAP TAB
+═══════════════════════════════════════════ */
+.map-wrap{display:grid;grid-template-columns:280px 1fr;flex:1;overflow:hidden;min-height:0}
+.map-side{background:var(--g1);border-right:1px solid var(--bdr);display:flex;flex-direction:column;overflow:hidden}
+
+.my-stop-box{
+  padding:14px 16px;border-bottom:1px solid var(--bdr);
+  background:linear-gradient(135deg,rgba(15,244,198,.06),transparent);
+}
+.msl{font-family:var(--mono);font-size:9px;color:var(--teal);text-transform:uppercase;letter-spacing:2px;margin-bottom:4px}
+.msn{font-size:14px;font-weight:700;color:#fff}
+.msd{font-size:10px;font-family:var(--mono);color:var(--muted);margin-top:4px}
+
+.stop-sel-row{padding:10px 14px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:8px}
+.stop-sel-row label{font-size:9px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:1px;white-space:nowrap}
+select{
+  flex:1;font-size:11px;padding:5px 8px;border-radius:5px;
+  border:1px solid var(--bdr2);background:var(--card);color:var(--txt);
+  font-family:var(--mono);cursor:pointer;outline:none;transition:.2s;
+}
+select:focus{border-color:var(--teal)}
+
+.bus-list-hdr{padding:8px 16px;border-bottom:1px solid var(--bdr);font-family:var(--mono);font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:2px;flex-shrink:0}
+.bus-list{overflow-y:auto;flex:1}
+.bus-card{
+  padding:12px 14px;border-bottom:1px solid var(--bdr);
+  cursor:pointer;transition:background .15s;
+}
+.bus-card:hover,.bus-card.sel{background:var(--card2)}
+.bc-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}
+.bc-name{font-size:11px;font-weight:700}
+.bc-type-tag{font-size:8px;font-family:var(--mono);padding:2px 6px;border-radius:3px;margin-left:5px}
+.tt-k{background:rgba(61,142,255,.12);color:var(--blue);border:1px solid rgba(61,142,255,.25)}
+.tt-e{background:rgba(255,170,0,.1);color:var(--amber);border:1px solid rgba(255,170,0,.25)}
+.tt-l{background:rgba(34,214,122,.08);color:var(--green);border:1px solid rgba(34,214,122,.2)}
+.bc-at{font-size:10px;color:var(--muted);margin-bottom:3px}
+.bc-state{font-size:10px;margin-bottom:4px}
+.bc-eta{font-size:13px;font-weight:700;margin-bottom:4px}
+.bc-dist{font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:5px}
+.bc-occ-row{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:3px}
+
+.map-main{display:flex;flex-direction:column;flex:1;overflow:hidden}
+.canvas-wrap{flex:1;position:relative;overflow:hidden;background:radial-gradient(ellipse at 40% 40%,#0a1020 0%,#050810 70%)}
+#busMap{width:100%;height:100%;display:block;cursor:crosshair}
+
+.detail-panel{
+  background:var(--g1);border-top:1px solid var(--bdr);
+  padding:12px 18px;flex-shrink:0;
+}
+.dp-title{font-size:12px;font-weight:600;color:#fff;margin-bottom:9px;font-family:var(--mono)}
+.dp-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px}
+.dp-stat{background:var(--card);border-radius:6px;padding:8px 10px;border:1px solid var(--bdr)}
+.dp-l{font-size:8px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:3px}
+.dp-v{font-size:14px;font-weight:700;font-family:var(--mono);color:#fff}
+.route-progress{display:flex;align-items:flex-start;overflow-x:auto;gap:0;padding-bottom:4px}
+.rp-stop{display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0}
+.rp-dot{width:9px;height:9px;border-radius:50%;border:2px solid;flex-shrink:0;transition:all .3s}
+.rp-name{font-size:8px;font-family:var(--mono);max-width:55px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rp-seg{display:flex;flex-direction:column;align-items:center;flex:1;min-width:24px;max-width:60px;flex-shrink:0}
+.rp-line{width:100%;height:2px;border-radius:1px;margin-top:3px}
+.rp-dist{font-size:7px;font-family:var(--mono);color:var(--dim);margin-top:3px;white-space:nowrap}
+
+/* ═══════════════════════════════════════════
+   REPORT TAB
+═══════════════════════════════════════════ */
+.report-scroll{overflow-y:auto;flex:1;padding:20px 24px}
+.report-inner{max-width:960px;margin:0 auto}
+
+.rep-hero{
+  background:linear-gradient(135deg,var(--g2) 0%,var(--g3) 100%);
+  border:1px solid var(--bdr);border-radius:12px;
+  padding:28px 32px;margin-bottom:24px;position:relative;overflow:hidden;
+}
+.rep-hero::after{
+  content:'BODS';position:absolute;right:-8px;bottom:-30px;
+  font-size:140px;font-weight:800;color:rgba(15,244,198,.03);
+  pointer-events:none;font-family:var(--sans);line-height:1;
+}
+.rep-eyebrow{font-family:var(--mono);font-size:9px;color:var(--teal);letter-spacing:3px;text-transform:uppercase;margin-bottom:10px}
+.rep-h1{font-size:28px;font-weight:800;color:#fff;line-height:1.15;margin-bottom:8px}
+.rep-desc{font-size:13px;color:var(--muted);line-height:1.75;max-width:580px;margin-bottom:20px}
+.rep-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.rk{background:var(--bg);border:1px solid var(--bdr);border-radius:8px;padding:14px 16px}
+.rk-l{font-size:9px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:5px}
+.rk-v{font-size:24px;font-weight:800;font-family:var(--mono)}
+
+.rep-sec{margin-bottom:28px}
+.rep-sh{
+  font-family:var(--mono);font-size:9px;color:var(--teal);
+  letter-spacing:3px;text-transform:uppercase;
+  margin-bottom:14px;padding-bottom:8px;
+  border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px;
+}
+.rep-sh::before{content:'';display:block;width:3px;height:14px;background:var(--teal);border-radius:2px}
+.rep-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.rep-tbl th{background:var(--card2);color:var(--muted);padding:9px 12px;text-align:left;border-bottom:1px solid var(--bdr);font-family:var(--mono);font-size:8px;letter-spacing:2px;text-transform:uppercase}
+.rep-tbl td{padding:9px 12px;border-bottom:1px solid rgba(28,42,66,.6);font-family:var(--mono);font-size:11px;color:var(--txt)}
+.rep-tbl tr:hover td{background:var(--card2)}
+.rep-tbl tr.best td{background:rgba(15,244,198,.04)} .rep-tbl tr.best td:first-child{border-left:2px solid var(--teal)}
+.cg{color:var(--green)} .ca{color:var(--amber)} .cr{color:var(--red)} .cb{color:var(--blue)}
+
+.feat-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.feat-name{font-size:11px;font-family:var(--mono);min-width:148px;color:var(--txt)}
+.feat-track{flex:1;background:var(--bdr);border-radius:3px;height:6px;overflow:hidden}
+.feat-fill{height:6px;border-radius:3px;background:linear-gradient(90deg,var(--teal),var(--blue))}
+.feat-val{font-family:var(--mono);font-size:11px;color:var(--muted);min-width:42px;text-align:right}
+
+.findings{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.finding{background:var(--card);border:1px solid var(--bdr);border-radius:var(--r);padding:16px;transition:border-color .2s}
+.finding:hover{border-color:var(--bdr2)}
+.f-ico{font-size:22px;margin-bottom:8px}
+.f-t{font-size:11px;font-weight:700;color:#fff;margin-bottom:5px;letter-spacing:.5px}
+.f-d{font-size:11px;color:var(--muted);line-height:1.65}
+</style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══ -->
+<header>
+  <div class="hdr-logo">
+    <div class="hdr-chip">BODS</div>
+    <div class="hdr-titles">
+      <div class="main">Bus Overload Detection System</div>
+      <div class="sub">ML-Powered · Real-Time · Bengaluru Transit Network</div>
+    </div>
+  </div>
+
+  <div class="hdr-center">
+    <div class="hdr-stat"><div class="kpi-v v" id="hTrips" style="font-size:18px">0</div><div class="l">Trips</div></div>
+    <div class="hdr-divider"></div>
+    <div class="hdr-stat"><div class="kpi-v v" id="hAlerts" style="font-size:18px;color:var(--red)">0</div><div class="l">Alerts</div></div>
+    <div class="hdr-divider"></div>
+    <div class="hdr-stat"><div class="kpi-v v" id="hOcc" style="font-size:18px">—</div><div class="l">Avg Occ</div></div>
+    <div class="hdr-divider"></div>
+    <div class="hdr-stat"><div class="kpi-v v" id="hLoad" style="font-size:18px;color:var(--muted)">IDLE</div><div class="l">Load</div></div>
+  </div>
+
+  <div class="hdr-right">
+    <div class="live-indicator">
+      <div class="pip" id="pip"></div>
+      <span class="live-text" id="liveText">OFFLINE</span>
+    </div>
+    <div class="clock" id="clock">--:--:--</div>
+    <button class="btn btn-start" id="btnStart" onclick="startSys()">▶ Start</button>
+    <button class="btn btn-pause" id="btnPause" onclick="pauseSys()" style="display:none">⏸ Pause</button>
+    <button class="btn btn-reset" onclick="resetSys()">↺ Reset</button>
+  </div>
+</header>
+
+<!-- ═══ TABS ═══ -->
+<nav class="tabs">
+  <div class="tab active" onclick="goTab('dash',this)">
+    <svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6"/><rect x="9" y="1" width="6" height="6"/><rect x="1" y="9" width="6" height="6"/><rect x="9" y="9" width="6" height="6"/></svg>
+    Live Dashboard
+  </div>
+  <div class="tab" onclick="goTab('map',this)">
+    <svg viewBox="0 0 16 16"><circle cx="8" cy="7" r="3"/><path d="M8 1a6 6 0 0 1 6 6c0 4-6 9-6 9S2 11 2 7a6 6 0 0 1 6-6z"/></svg>
+    Bus Tracker Map
+  </div>
+  <div class="tab" onclick="goTab('report',this)">
+    <svg viewBox="0 0 16 16"><rect x="2" y="1" width="12" height="14" rx="1"/><line x1="5" y1="5" x2="11" y2="5" stroke="currentColor" stroke-width="1.5"/><line x1="5" y1="8" x2="11" y2="8" stroke="currentColor" stroke-width="1.5"/><line x1="5" y1="11" x2="9" y2="11" stroke="currentColor" stroke-width="1.5"/></svg>
+    Project Report
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════════════
+     PANE 1: DASHBOARD
+═══════════════════════════════════════════ -->
+<div class="pane active" id="pane-dash">
+  <div class="dash-wrap">
+
+    <!-- KPI Strip -->
+    <div class="kpi-strip">
+      <div class="kpi-card teal">
+        <div class="kpi-icon">🚌</div>
+        <div class="kpi-l">Trips Processed</div>
+        <div class="kpi-v" id="kTrips">0</div>
+        <div class="kpi-s">since session start</div>
+      </div>
+      <div class="kpi-card red">
+        <div class="kpi-icon">🚨</div>
+        <div class="kpi-l">Overload Alerts</div>
+        <div class="kpi-v" id="kAlerts">0</div>
+        <div class="kpi-s">buses above 100%</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-icon">📊</div>
+        <div class="kpi-l">Avg Occupancy</div>
+        <div class="kpi-v" id="kOccD">—</div>
+        <div class="kpi-s">fleet-wide average</div>
+      </div>
+      <div class="kpi-card amber">
+        <div class="kpi-icon">🚏</div>
+        <div class="kpi-l">Buses At Stop</div>
+        <div class="kpi-v" id="kAtStop">0</div>
+        <div class="kpi-s">currently dwelling</div>
+      </div>
+      <div class="kpi-card blue">
+        <div class="kpi-icon">⚡</div>
+        <div class="kpi-l">System Status</div>
+        <div class="kpi-v" id="kStatus" style="font-size:18px">IDLE</div>
+        <div class="kpi-s" id="kStatusSub">press start</div>
+      </div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="dash-grid">
+
+      <!-- Routes panel -->
+      <div class="card dash-routes">
+        <div class="card-hdr">Live Route Monitor <span class="tag" id="routeMeta">8 routes</span></div>
+        <div class="card-body" id="routeRows"></div>
+      </div>
+
+      <!-- Chart -->
+      <div class="card dash-chart">
+        <div class="card-hdr">Occupancy Trend <span class="tag">last 30 events</span></div>
+        <div class="chart-inner"><canvas id="trendChart"></canvas></div>
+      </div>
+
+      <!-- Alerts -->
+      <div class="card dash-alerts">
+        <div class="card-hdr">Alert Feed <span class="tag" id="alertCount">0 alerts</span></div>
+        <div class="card-body" id="alertFeed">
+          <div style="padding:20px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:11px">Waiting for stream...</div>
+        </div>
+      </div>
+
+      <!-- Log -->
+      <div class="card dash-log">
+        <div class="card-hdr">Trip Event Log <span class="tag" id="logCount">0 events</span></div>
+        <div class="card-body" id="tripLog">
+          <div style="padding:20px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:11px">No events yet</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     PANE 2: MAP
+═══════════════════════════════════════════ -->
+<div class="pane" id="pane-map">
+  <div class="map-wrap">
+
+    <!-- Sidebar -->
+    <div class="map-side">
+      <div class="my-stop-box">
+        <div class="msl">Your Stop</div>
+        <div class="msn" id="myStopName">Majestic Bus Stand</div>
+        <div class="msd" id="myStopInfo">Watching all incoming buses</div>
+      </div>
+      <div class="stop-sel-row">
+        <label>Change Stop:</label>
+        <select id="stopDropdown" onchange="changeMyStop(+this.value)">
+          <option value="0">Majestic Bus Stand</option>
+          <option value="1">Shivajinagar</option>
+          <option value="2">KR Market</option>
+          <option value="3">Yeshwanthpur</option>
+          <option value="4">Jayanagar</option>
+          <option value="5">Whitefield</option>
+          <option value="6">Electronic City</option>
+          <option value="7">Hebbal</option>
+          <option value="8">Koramangala</option>
+          <option value="9">Indiranagar</option>
+        </select>
+      </div>
+      <div class="bus-list-hdr">All Buses — sorted by distance to you</div>
+      <div class="bus-list" id="busList">
+        <div style="padding:18px;color:var(--muted);font-size:11px;font-family:var(--mono)">Press Start to track buses</div>
+      </div>
+    </div>
+
+    <!-- Map + Detail -->
+    <div class="map-main">
+      <div class="canvas-wrap">
+        <canvas id="busMap"></canvas>
+      </div>
+      <div class="detail-panel">
+        <div class="dp-title" id="dpTitle" style="font-family:var(--mono)">Click any bus on the map or in the sidebar to see details</div>
+        <div class="dp-stats" id="dpStats"></div>
+        <div class="route-progress" id="routeProgress"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     PANE 3: REPORT
+═══════════════════════════════════════════ -->
+<div class="pane" id="pane-report">
+  <div class="report-scroll">
+  <div class="report-inner">
+
+    <div class="rep-hero">
+      <div class="rep-eyebrow">Data Science Project · 2024 · Bengaluru, Karnataka</div>
+      <div class="rep-h1">Bus Overload<br>Detection System</div>
+      <div class="rep-desc">An end-to-end machine learning pipeline that detects, predicts, and visualises passenger overloading across KSRTC, Express, and Local bus routes in real time. Passengers see which bus is coming, how full it is, and how far away it is — before it arrives.</div>
+      <div class="rep-kpis">
+        <div class="rk"><div class="rk-l">Dataset</div><div class="rk-v" style="color:var(--teal)">14,700</div><div style="font-size:10px;color:var(--muted);margin-top:3px">trip records</div></div>
+        <div class="rk"><div class="rk-l">Best Accuracy</div><div class="rk-v" style="color:var(--green)">97.76%</div><div style="font-size:10px;color:var(--muted);margin-top:3px">Random Forest</div></div>
+        <div class="rk"><div class="rk-l">AUC-ROC</div><div class="rk-v" style="color:var(--blue)">0.9921</div><div style="font-size:10px;color:var(--muted);margin-top:3px">near perfect</div></div>
+        <div class="rk"><div class="rk-l">Overload Rate</div><div class="rk-v" style="color:var(--red)">31.3%</div><div style="font-size:10px;color:var(--muted);margin-top:3px">of all trips</div></div>
+      </div>
+    </div>
+
+    <div class="rep-sec">
+      <div class="rep-sh">Threshold Logic</div>
+      <table class="rep-tbl">
+        <thead><tr><th>Level</th><th>Condition</th><th>Occupancy</th><th>Response</th><th>Indicator</th></tr></thead>
+        <tbody>
+          <tr><td class="cg">NORMAL</td><td>pax &lt; 82% of capacity</td><td class="cg">&lt; 82%</td><td>No action needed</td><td>🟢 Green bar</td></tr>
+          <tr><td class="ca">WARNING</td><td>82% ≤ pax ≤ 100%</td><td class="ca">82–100%</td><td>Early dispatcher alert</td><td>🟡 Amber bar</td></tr>
+          <tr><td class="cr">OVERLOAD</td><td>pax &gt; 100% capacity</td><td class="cr">&gt; 100%</td><td>Red alert + extra bus</td><td>🔴 Red blinking</td></tr>
+        </tbody>
+      </table>
+      <div style="font-size:11px;color:var(--muted);line-height:1.7;font-family:var(--mono);padding:12px 14px;background:var(--card);border:1px solid var(--bdr);border-radius:6px">
+        <span style="color:var(--teal)">WHY 82% FOR WARNING?</span> — Buses fill rapidly at stops. When a bus is already 82% full and 10+ passengers board at the next stop, it immediately overloads. The 82% threshold gives dispatchers 1–2 stops of reaction time to deploy an extra bus before the overload actually occurs.
+      </div>
+    </div>
+
+    <div class="rep-sec">
+      <div class="rep-sh">Model Comparison</div>
+      <table class="rep-tbl">
+        <thead><tr><th>Model</th><th>Accuracy</th><th>F1 Score</th><th>AUC-ROC</th><th>Precision</th><th>Recall</th><th>Speed</th></tr></thead>
+        <tbody>
+          <tr class="best"><td>Random Forest <span style="color:var(--teal);font-size:8px;margin-left:6px">★ CHOSEN</span></td><td class="cg">97.76%</td><td class="cg">0.9639</td><td class="cg">0.9921</td><td class="cg">96.9%</td><td class="cg">95.9%</td><td class="cg">Fast</td></tr>
+          <tr><td>Gradient Boosting</td><td class="cg">97.72%</td><td class="cg">0.9634</td><td class="cg">0.9925</td><td class="cg">96.8%</td><td class="cg">95.8%</td><td class="ca">Slow</td></tr>
+          <tr><td>Logistic Regression</td><td class="cg">97.76%</td><td class="cg">0.9639</td><td class="ca">0.9656</td><td class="cg">96.9%</td><td class="cg">95.9%</td><td class="cg">Fastest</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rep-sec">
+      <div class="rep-sh">Confusion Matrix — Random Forest</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:360px;margin-bottom:14px">
+        <div style="background:rgba(34,214,122,.08);border:1px solid rgba(34,214,122,.25);border-radius:6px;padding:16px;text-align:center"><div style="font-family:var(--mono);font-size:26px;font-weight:700;color:var(--green)">1993</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted);margin-top:4px">True Negative ✓</div></div>
+        <div style="background:rgba(255,170,0,.07);border:1px solid rgba(255,170,0,.2);border-radius:6px;padding:16px;text-align:center"><div style="font-family:var(--mono);font-size:26px;font-weight:700;color:var(--amber)">28</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted);margin-top:4px">False Positive ⚠</div></div>
+        <div style="background:rgba(255,51,88,.08);border:1px solid rgba(255,51,88,.25);border-radius:6px;padding:16px;text-align:center"><div style="font-family:var(--mono);font-size:26px;font-weight:700;color:var(--red)">38</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted);margin-top:4px">False Negative ✗</div></div>
+        <div style="background:rgba(34,214,122,.08);border:1px solid rgba(34,214,122,.25);border-radius:6px;padding:16px;text-align:center"><div style="font-family:var(--mono);font-size:26px;font-weight:700;color:var(--green)">881</div><div style="font-size:10px;font-family:var(--mono);color:var(--muted);margin-top:4px">True Positive ✓</div></div>
+      </div>
+    </div>
+
+    <div class="rep-sec">
+      <div class="rep-sh">Feature Importance — Random Forest</div>
+      <div id="featBars"></div>
+    </div>
+
+    <div class="rep-sec">
+      <div class="rep-sh">Bus Types in This System</div>
+      <table class="rep-tbl">
+        <thead><tr><th>Type</th><th>Routes</th><th>Capacity</th><th>Dwell Time</th><th>Overload Risk</th><th>Reason</th></tr></thead>
+        <tbody>
+          <tr><td class="cb">KSRTC</td><td>Vajra 500C, 400GA, 600B</td><td>45–50</td><td>~20 sec</td><td class="ca">Medium</td><td style="color:var(--muted)">AC buses, fixed stops</td></tr>
+          <tr><td class="ca">EXPRESS</td><td>Volvo 500CA, 335E, 201</td><td>40–55</td><td>~15 sec</td><td class="cg">Lower</td><td style="color:var(--muted)">Limited stops, faster</td></tr>
+          <tr><td class="cg">LOCAL</td><td>Local 315, Local 108</td><td>50–60</td><td>~30 sec</td><td class="cr">Highest</td><td style="color:var(--muted)">Many stops, more boarding</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rep-sec">
+      <div class="rep-sh">Key Findings & Recommendations</div>
+      <div class="findings">
+        <div class="finding"><div class="f-ico">🎯</div><div class="f-t">97.76% ACCURACY</div><div class="f-d">Random Forest correctly classified 2,874 out of 2,940 test trips. Production-ready for real dispatch integration.</div></div>
+        <div class="finding"><div class="f-ico">⏰</div><div class="f-t">PEAK HOUR = 41%</div><div class="f-d">Rush hour is the single biggest predictor. Overload rate jumps from 2% off-peak to 77%+ during 7–9 AM and 5–8 PM.</div></div>
+        <div class="finding"><div class="f-ico">🚌</div><div class="f-t">LOCAL BUSES WORST</div><div class="f-d">Local buses overload most (33%+) due to more stops, longer dwell time, and higher boarding rates per stop.</div></div>
+        <div class="finding"><div class="f-ico">📏</div><div class="f-t">STOP DISTANCES</div><div class="f-d">400m–1.2km between stops in Bengaluru. Closer stops mean more boarding events and higher cumulative overload risk.</div></div>
+        <div class="finding"><div class="f-ico">🔁</div><div class="f-t">LAG FEATURE: 13.9%</div><div class="f-d">Previous trip occupancy is 3rd most important feature — packed buses tend to stay packed across consecutive trips.</div></div>
+        <div class="finding"><div class="f-ico">🔮</div><div class="f-t">REAL DEPLOYMENT</div><div class="f-d">Replace simulator with real GPS + IoT passenger counters. Model serves via REST API, pushes alerts to dispatcher app.</div></div>
+      </div>
+    </div>
+
+  </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ── STOP DATA ──
+const STOPS = [
+  {name:'Majestic Bus Stand', x:242, y:222},
+  {name:'Shivajinagar',       x:312, y:168},
+  {name:'KR Market',          x:172, y:272},
+  {name:'Yeshwanthpur',       x:148, y:148},
+  {name:'Jayanagar',          x:220, y:332},
+  {name:'Whitefield',         x:434, y:188},
+  {name:'Electronic City',    x:310, y:404},
+  {name:'Hebbal',             x:268, y:108},
+  {name:'Koramangala',        x:332, y:310},
+  {name:'Indiranagar',        x:384, y:228},
+  {name:'Bannerghatta',       x:238, y:420},
+  {name:'Rajajinagar',        x:160, y:192},
+];
+
+function stopDist(a, b) {
+  const dx = STOPS[b].x - STOPS[a].x, dy = STOPS[b].y - STOPS[a].y;
+  return Math.round(Math.sqrt(dx*dx+dy*dy) * 8.5);
+}
+
+// ── BUS DEFINITIONS ──
+const BUS_DEF = [
+  {id:'KA-01-F-1234', name:'KSRTC Vajra 500C',  type:'KSRTC',   color:'#3d8eff', cap:45, peakF:1.25, seq:[0,3,7,1,9,5],    dwell:20},
+  {id:'KA-57-B-9801', name:'Volvo AC 500CA',     type:'EXPRESS', color:'#ffaa00', cap:40, peakF:1.35, seq:[0,1,9,5],         dwell:15},
+  {id:'KA-01-B-5566', name:'Local Bus 315',      type:'LOCAL',   color:'#22d67a', cap:60, peakF:1.20, seq:[2,0,4,10,6],      dwell:30},
+  {id:'KA-05-C-7712', name:'KSRTC 400GA',        type:'KSRTC',   color:'#b06eff', cap:50, peakF:1.30, seq:[3,11,0,2,4,6],   dwell:20},
+  {id:'KA-01-F-3345', name:'Express 201',        type:'EXPRESS', color:'#ff6b9d', cap:55, peakF:1.28, seq:[7,0,1,8,9],       dwell:15},
+  {id:'KA-41-A-8821', name:'Local Bus 108',      type:'LOCAL',   color:'#0ff4c6', cap:50, peakF:1.22, seq:[4,2,0,11,3],      dwell:30},
+  {id:'KA-01-G-4490', name:'KSRTC 600B',         type:'KSRTC',   color:'#fb923c', cap:45, peakF:1.20, seq:[5,9,1,0,2],       dwell:20},
+  {id:'KA-57-D-2201', name:'Volvo AC 335E',      type:'EXPRESS', color:'#e879f9', cap:40, peakF:1.32, seq:[6,8,0,7],         dwell:15},
+];
+
+// ── STATE ──
+let myStop = 0;
+let selBus = null;
+let running = false;
+let mainInt = null, clockInt = null;
+let trips = 0, alerts = 0, logCount = 0;
+const TICK = 1500, TSEC = 1.5;
+
+// ── INIT BUSES ──
+function mkBuses() {
+  return BUS_DEF.map((d, i) => {
+    const ci = i % d.seq.length;
+    const pax = Math.floor(d.cap * (0.2 + Math.random() * 0.45));
+    return {
+      ...d,
+      ci,                              // current stop index in seq
+      ni: (ci+1) % d.seq.length,      // next stop index in seq
+      t: 0,                            // 0=at cur, 1=at next
+      atStop: true,
+      dwellLeft: 4 + Math.random()*6, // seconds
+      dwellTotal: d.dwell,
+      pax,
+      nextPax: pax,                    // applied after dwell
+      spd: 0.0035 + Math.random()*0.003,
+    };
+  });
+}
+let buses = mkBuses();
+
+// ── HELPERS ──
+const rnd = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
+const isPeak = () => { const h=new Date().getHours(); return (h>=7&&h<=9)||(h>=17&&h<=20); };
+const getStatus = b => { const r=b.pax/b.cap; return r>1?'OVERLOAD':r>0.82?'WARNING':'NORMAL'; };
+const stColor = s => s==='OVERLOAD'?'var(--red)':s==='WARNING'?'var(--amber)':'var(--green)';
+const stBadge = s => s==='OVERLOAD'?'b-over':s==='WARNING'?'b-warn':'b-ok';
+const stText = s => s==='OVERLOAD'?'OVER':s==='WARNING'?'WARN':'OK';
+const curSI = b => b.seq[b.ci]; // global stop index of current stop
+const nxtSI = b => b.seq[b.ni]; // global stop index of next stop
+function ts() {
+  const n=new Date();
+  return [n.getHours(),n.getMinutes(),n.getSeconds()].map(v=>String(v).padStart(2,'0')).join(':');
+}
+function busMapXY(b) {
+  const cs=STOPS[curSI(b)], ns=STOPS[nxtSI(b)];
+  return {x: cs.x+(ns.x-cs.x)*b.t, y: cs.y+(ns.y-cs.y)*b.t};
+}
+function distToMyStop(b) {
+  const p=busMapXY(b), ms=STOPS[myStop];
+  return Math.round(Math.hypot(p.x-ms.x, p.y-ms.y)*8.5);
+}
+function etaMins(b) {
+  const d=distToMyStop(b);
+  if(d<70) return 0;
+  const mpm = b.type==='EXPRESS'?460:b.type==='KSRTC'?380:280;
+  return Math.max(1, Math.round(d/mpm));
+}
+function fmtD(d) {
+  if(d<70) return 'At your stop';
+  return d>1000 ? (Math.round(d/100)/10)+'km' : d+'m';
+}
+
+// ══ BUS MOVEMENT ENGINE ══
+// Passengers ONLY change when bus finishes dwelling at a stop.
+// No random flickering between stops.
+function tickBuses() {
+  buses.forEach(b => {
+    if (b.atStop) {
+      b.dwellLeft -= TSEC;
+      if (b.dwellLeft <= 0) {
+        // Apply new pax count (calculated when bus arrived)
+        b.pax = b.nextPax;
+        b.atStop = false;
+        b.t = 0;
+        // Advance sequence
+        b.ci = b.ni;
+        b.ni = (b.ni + 1) % b.seq.length;
+      }
+    } else {
+      b.t = Math.min(1, b.t + b.spd);
+      if (b.t >= 1) {
+        // Arrived at next stop
+        b.t = 1; b.atStop = true;
+        const peak = isPeak();
+        const alight = Math.floor(b.pax * (0.15 + Math.random()*0.25));
+        const board  = Math.floor(b.cap * (peak ? (0.12+Math.random()*0.22) : (0.04+Math.random()*0.14)));
+        b.nextPax = Math.max(0, Math.min(b.pax - alight + board, Math.floor(b.cap*1.2)));
+        b.dwellLeft  = b.dwell + Math.random()*15;
+        b.dwellTotal = b.dwellLeft;
+      }
+    }
+  });
+}
+
+// ══ DASHBOARD RENDER ══
+function renderRoutes() {
+  const el = document.getElementById('routeRows');
+  let moving=0, stopped=0;
+  let html = '';
+  buses.forEach(b => {
+    b.atStop ? stopped++ : moving++;
+    const st=getStatus(b), sc=stColor(st), pct=Math.round(b.pax/b.cap*100);
+    const dwPct = b.atStop ? Math.max(0,Math.min(100,(b.dwellLeft/b.dwellTotal)*100)) : 0;
+    const curN = STOPS[curSI(b)].name, nxtN = STOPS[nxtSI(b)].name;
+    const typeClass = b.type==='KSRTC'?'ksrtc':b.type==='EXPRESS'?'express':'local';
+    const badgeHtml = b.atStop
+      ? `<span class="badge b-stop">AT STOP</span>`
+      : `<span class="badge ${stBadge(st)}">${st}</span>`;
+    html += `<div class="r-row${st==='OVERLOAD'?' over':''}">
+      <div>
+        <div class="r-id">${b.id.split('-').slice(0,3).join('-')}</div>
+        <div class="r-type ${typeClass}">${b.type}</div>
+      </div>
+      <div>
+        <div class="r-info">${b.pax}/${b.cap} pax · ${b.atStop ? '🚏 '+curN : '→ '+nxtN}</div>
+        <div class="bar-bg"><div class="bar-fg" style="width:${Math.min(pct,100)}%;background:${sc}"></div></div>
+        ${b.atStop
+          ? `<div class="dwell-bar"><div class="dwell-fill" style="width:${dwPct}%"></div></div>
+             <div style="font-size:8px;color:var(--purple);font-family:var(--mono);margin-top:1px">⏳ ${Math.ceil(b.dwellLeft)}s dwell</div>`
+          : ''}
+      </div>
+      <div class="r-pct" style="color:${sc}">${pct}%</div>
+      ${badgeHtml}
+    </div>`;
+  });
+  el.innerHTML = html;
+  document.getElementById('routeMeta').textContent = `${moving} moving · ${stopped} at stop`;
+}
+
+function pushAlert(b, st) {
+  const f = document.getElementById('alertFeed');
+  if (f.querySelector('[data-empty]')) f.innerHTML='';
+  const c = stColor(st);
+  const d = document.createElement('div'); d.className='a-item';
+  d.innerHTML = `<div class="a-dot" style="background:${c}"></div>
+    <div>
+      <div class="a-msg"><b style="color:${c}">${b.name}</b> <span style="color:var(--muted)">(${b.type})</span> — ${b.pax}/${b.cap} pax at <b>${STOPS[curSI(b)].name}</b></div>
+      <div class="a-ts">${ts()} · ${Math.round(b.pax/b.cap*100)}% occupancy · ${b.atStop?'DWELLING':'MOVING'}</div>
+    </div>`;
+  f.prepend(d);
+  while(f.children.length>18) f.removeChild(f.lastChild);
+  alerts++;
+  document.getElementById('alertCount').textContent = alerts+' alerts';
+}
+
+function pushLog(b, st) {
+  const f = document.getElementById('tripLog');
+  if (f.querySelector('[data-empty]')) f.innerHTML='';
+  const tc = b.type==='KSRTC'?'var(--blue)':b.type==='EXPRESS'?'var(--amber)':'var(--green)';
+  const lbc = st==='OVERLOAD'?'lb-o':st==='WARNING'?'lb-w':'lb-n';
+  const d = document.createElement('div'); d.className='log-row';
+  d.innerHTML = `<span class="l-ts">${ts()}</span>
+    <span class="l-type" style="color:${tc}">${b.type}</span>
+    <span class="l-pax">${b.pax}/${b.cap}</span>
+    <span class="l-stop">${STOPS[curSI(b)].name}</span>
+    <span class="l-badge ${lbc}">${stText(st)}</span>`;
+  f.prepend(d);
+  logCount++;
+  while(f.children.length>30) f.removeChild(f.lastChild);
+  document.getElementById('logCount').textContent = logCount+' events';
+}
+
+function updateKPIs() {
+  const avgOcc = Math.round(buses.reduce((s,b)=>s+b.pax/b.cap,0)/buses.length*100);
+  const ov = buses.filter(b=>getStatus(b)==='OVERLOAD').length;
+  const wn = buses.filter(b=>getStatus(b)==='WARNING').length;
+  const stopped = buses.filter(b=>b.atStop).length;
+
+  document.getElementById('kTrips').textContent   = trips;
+  document.getElementById('kAlerts').textContent  = alerts;
+  document.getElementById('kOccD').textContent    = avgOcc+'%';
+  document.getElementById('kAtStop').textContent  = stopped;
+  document.getElementById('hTrips').textContent   = trips;
+  document.getElementById('hAlerts').textContent  = alerts;
+  document.getElementById('hOcc').textContent     = avgOcc+'%';
+
+  const ks = document.getElementById('kStatus'), kss = document.getElementById('kStatusSub');
+  const hl = document.getElementById('hLoad');
+  if (!running) { ks.textContent='IDLE'; ks.style.color='var(--muted)'; hl.textContent='IDLE'; hl.style.color='var(--muted)'; return; }
+  if (ov>=4)      { ks.textContent='CRITICAL'; ks.style.color='var(--red)';   hl.textContent='CRITICAL'; hl.style.color='var(--red)';   kss.textContent=ov+' overloaded'; }
+  else if (ov>=2) { ks.textContent='HIGH';     ks.style.color='var(--red)';   hl.textContent='HIGH';     hl.style.color='var(--red)';   kss.textContent=ov+' overloaded'; }
+  else if (ov||wn>=2){ks.textContent='MED'; ks.style.color='var(--amber)'; hl.textContent='MED'; hl.style.color='var(--amber)'; kss.textContent='monitor closely';}
+  else if (wn)    { ks.textContent='LOW';      ks.style.color='var(--amber)'; hl.textContent='LOW';      hl.style.color='var(--amber)'; kss.textContent=wn+' warnings'; }
+  else            { ks.textContent='GOOD';     ks.style.color='var(--green)'; hl.textContent='GOOD';     hl.style.color='var(--green)'; kss.textContent='all nominal'; }
+}
+
+// ── TREND CHART ──
+let chart = null;
+function initChart() {
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  chart = new Chart(ctx, {
+    type:'line',
+    data:{labels:[],datasets:[
+      {label:'Avg Occupancy',data:[],borderColor:'#0ff4c6',backgroundColor:'rgba(15,244,198,.07)',fill:true,tension:.4,pointRadius:2,borderWidth:1.5,pointBackgroundColor:'#0ff4c6'},
+      {label:'Overload 100%',data:[],borderColor:'rgba(255,51,88,.45)',borderDash:[5,4],pointRadius:0,borderWidth:1.2},
+      {label:'Warning 82%', data:[],borderColor:'rgba(255,170,0,.35)',borderDash:[3,4],pointRadius:0,borderWidth:1},
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:{duration:200},
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{color:'rgba(28,42,66,.7)'},ticks:{color:'#4a5f80',font:{size:8},maxTicksLimit:8}},
+        y:{grid:{color:'rgba(28,42,66,.7)'},ticks:{color:'#4a5f80',font:{size:9},callback:v=>v+'%'},min:0,max:140},
+      }
+    }
+  });
+}
+function pushChart(occ) {
+  if (!chart) return;
+  chart.data.labels.push(ts());
+  chart.data.datasets[0].data.push(occ);
+  chart.data.datasets[1].data.push(100);
+  chart.data.datasets[2].data.push(82);
+  if (chart.data.labels.length > 30) {
+    chart.data.labels.shift();
+    chart.data.datasets.forEach(d=>d.data.shift());
+  }
+  chart.update('none');
+}
+
+// ══ MAP ══
+const canvas = document.getElementById('busMap');
+const ctx2d = canvas.getContext('2d');
+let CW=0, CH=0;
+const sx = x => x/500*CW, sy = y => y/480*CH;
+
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  CW = rect.width; CH = rect.height || 400;
+  canvas.width=CW; canvas.height=CH;
+  drawMap();
+}
+
+function drawMap() {
+  if (!CW||!CH) return;
+  // Background
+  ctx2d.fillStyle = '#05080f'; ctx2d.fillRect(0,0,CW,CH);
+  // Subtle grid
+  ctx2d.strokeStyle='rgba(255,255,255,.015)'; ctx2d.lineWidth=1;
+  for(let x=0;x<CW;x+=44){ctx2d.beginPath();ctx2d.moveTo(x,0);ctx2d.lineTo(x,CH);ctx2d.stroke()}
+  for(let y=0;y<CH;y+=44){ctx2d.beginPath();ctx2d.moveTo(0,y);ctx2d.lineTo(CW,y);ctx2d.stroke()}
+  // Buildings blocks
+  ctx2d.fillStyle='rgba(15,24,42,.8)';
+  [[60,60,110,70],[200,60,120,70],[340,55,90,70],[60,155,90,90],[195,175,120,82],[345,172,105,82],
+   [60,295,105,75],[195,295,108,75],[355,285,96,85],[60,390,112,88],[200,402,95,75],[340,392,125,74]].forEach(b=>{
+    ctx2d.fillRect(sx(b[0]),sy(b[1]),sx(b[0]+b[2])-sx(b[0]),sy(b[1]+b[3])-sy(b[1]));
+  });
+
+  // Route paths + distance labels between stops
+  buses.forEach(b => {
+    ctx2d.beginPath();
+    b.seq.forEach((si,i) => {
+      const s=STOPS[si];
+      i===0 ? ctx2d.moveTo(sx(s.x),sy(s.y)) : ctx2d.lineTo(sx(s.x),sy(s.y));
+    });
+    ctx2d.strokeStyle = b.color+'28'; ctx2d.lineWidth=2.5;
+    ctx2d.setLineDash([6,5]); ctx2d.stroke(); ctx2d.setLineDash([]);
+
+    // Distance labels on each segment
+    b.seq.forEach((si, i) => {
+      if (i===0) return;
+      const prev = b.seq[i-1];
+      const ps=STOPS[prev], cs=STOPS[si];
+      const mx=sx((ps.x+cs.x)/2), my=sy((ps.y+cs.y)/2);
+      const d=stopDist(prev,si);
+      ctx2d.font='8px JetBrains Mono,monospace';
+      ctx2d.fillStyle='rgba(70,95,128,.85)';
+      ctx2d.textAlign='center'; ctx2d.textBaseline='middle';
+      ctx2d.fillText(d+'m', mx, my-7);
+    });
+  });
+
+  // Draw stops
+  STOPS.forEach((s, i) => {
+    const x=sx(s.x), y=sy(s.y), isMe=i===myStop;
+    if (isMe) {
+      ctx2d.beginPath(); ctx2d.arc(x,y,15,0,Math.PI*2);
+      ctx2d.fillStyle='rgba(15,244,198,.1)'; ctx2d.fill();
+      ctx2d.beginPath(); ctx2d.arc(x,y,8,0,Math.PI*2);
+      ctx2d.fillStyle='#0ff4c6'; ctx2d.fill();
+      ctx2d.beginPath(); ctx2d.arc(x,y,4,0,Math.PI*2);
+      ctx2d.fillStyle='#05080f'; ctx2d.fill();
+      ctx2d.font='bold 10px Outfit,sans-serif';
+      ctx2d.fillStyle='#0ff4c6'; ctx2d.textAlign='center'; ctx2d.textBaseline='bottom';
+      ctx2d.fillText('YOU', x, y-17);
+      ctx2d.font='9px Outfit,sans-serif';
+      ctx2d.fillText(s.name, x, y-28);
+    } else {
+      ctx2d.beginPath(); ctx2d.arc(x,y,4.5,0,Math.PI*2);
+      ctx2d.fillStyle='#0d1221'; ctx2d.fill();
+      ctx2d.strokeStyle='#1c2a42'; ctx2d.lineWidth=1.5; ctx2d.stroke();
+      ctx2d.font='8px JetBrains Mono,monospace';
+      ctx2d.fillStyle='#283d5c'; ctx2d.textAlign='center'; ctx2d.textBaseline='bottom';
+      ctx2d.fillText(s.name, x, y-8);
+    }
+  });
+
+  // Draw buses
+  buses.forEach(b => {
+    const pos=busMapXY(b), x=sx(pos.x), y=sy(pos.y);
+    const st=getStatus(b);
+    const bc = st==='OVERLOAD'?'#ff3358':st==='WARNING'?'#ffaa00':b.color;
+    const isSel = selBus && selBus.id===b.id;
+
+    // Glow for selected
+    if (isSel) {
+      ctx2d.beginPath(); ctx2d.arc(x,y,22,0,Math.PI*2);
+      ctx2d.fillStyle=bc+'18'; ctx2d.fill();
+      ctx2d.beginPath(); ctx2d.arc(x,y,16,0,Math.PI*2);
+      ctx2d.fillStyle=bc+'10'; ctx2d.fill();
+    }
+    // Bus body
+    const bw=34, bh=18;
+    ctx2d.fillStyle=bc;
+    ctx2d.beginPath();
+    if(ctx2d.roundRect) ctx2d.roundRect(x-bw/2,y-bh/2,bw,bh,5);
+    else ctx2d.rect(x-bw/2,y-bh/2,bw,bh);
+    ctx2d.fill();
+    // Type label
+    ctx2d.font='bold 8px JetBrains Mono,monospace';
+    ctx2d.fillStyle='rgba(0,0,0,.88)'; ctx2d.textAlign='center'; ctx2d.textBaseline='middle';
+    ctx2d.fillText(b.type.slice(0,3), x, y);
+    // STOP badge
+    if (b.atStop) {
+      ctx2d.fillStyle='rgba(176,110,255,.9)';
+      ctx2d.beginPath();
+      if(ctx2d.roundRect) ctx2d.roundRect(x-14,y+11,28,12,3);
+      else ctx2d.rect(x-14,y+11,28,12);
+      ctx2d.fill();
+      ctx2d.font='bold 7px JetBrains Mono,monospace';
+      ctx2d.fillStyle='#fff'; ctx2d.textBaseline='middle';
+      ctx2d.fillText('STOP', x, y+17);
+    }
+    // Distance + ETA above bus
+    const d=distToMyStop(b), eta=etaMins(b);
+    ctx2d.font='9px JetBrains Mono,monospace'; ctx2d.fillStyle=bc; ctx2d.textBaseline='bottom';
+    const label = d<70 ? '● HERE' : (d>999?(Math.round(d/100)/10)+'km':d+'m')+' · '+eta+'min';
+    ctx2d.fillText(label, x, y-11);
+  });
+}
+
+canvas.addEventListener('click', e => {
+  const r=canvas.getBoundingClientRect();
+  const cx=e.clientX-r.left, cy=e.clientY-r.top;
+  let best=null, bestD=999;
+  buses.forEach(b => {
+    const p=busMapXY(b), d=Math.hypot(cx-sx(p.x), cy-sy(p.y));
+    if(d<26&&d<bestD){bestD=d;best=b;}
+  });
+  if(best) selectBus(best);
+});
+
+function selectBus(b) {
+  selBus = b;
+  const st=getStatus(b), sc=stColor(st);
+  const occ=Math.round(b.pax/b.cap*100);
+  const d=distToMyStop(b), eta=etaMins(b);
+
+  document.getElementById('dpTitle').textContent = `${b.name}  ·  ${b.id}  ·  ${b.type}`;
+
+  document.getElementById('dpStats').innerHTML = `
+    <div class="dp-stat"><div class="dp-l">Passengers</div><div class="dp-v">${b.pax}/${b.cap}</div></div>
+    <div class="dp-stat"><div class="dp-l">Occupancy</div><div class="dp-v" style="color:${sc}">${occ}%</div></div>
+    <div class="dp-stat"><div class="dp-l">Status</div><div class="dp-v" style="color:${b.atStop?'var(--purple)':sc};font-size:11px">${b.atStop?'AT STOP ('+Math.ceil(b.dwellLeft)+'s)':st}</div></div>
+    <div class="dp-stat"><div class="dp-l">Distance</div><div class="dp-v" style="font-size:12px">${fmtD(d)}</div></div>
+    <div class="dp-stat"><div class="dp-l">ETA to You</div><div class="dp-v">${d<70?'HERE':eta+' min'}</div></div>`;
+
+  // Stop progress with distances
+  const rp = document.getElementById('routeProgress');
+  rp.innerHTML='';
+  b.seq.forEach((si,i) => {
+    const isMe=si===myStop, isPast=i<b.ci, isCur=i===b.ci;
+    const dc = isMe?'var(--teal)' : isCur?b.color : isPast?'var(--muted)':'var(--bdr2)';
+    const sw=document.createElement('div'); sw.className='rp-stop';
+    sw.innerHTML = `
+      <div class="rp-dot" style="border-color:${dc};background:${isPast||isCur?dc:'transparent'}"></div>
+      <div class="rp-name" style="color:${isMe?'var(--teal)':isPast?'var(--muted)':'var(--txt)'};font-weight:${isMe?700:400}">${STOPS[si].name}</div>`;
+    rp.appendChild(sw);
+    if (i < b.seq.length-1) {
+      const segDist = stopDist(si, b.seq[i+1]);
+      const seg=document.createElement('div'); seg.className='rp-seg';
+      seg.innerHTML=`<div class="rp-line" style="background:${isPast?b.color:'var(--bdr)'}"></div><div class="rp-dist">${segDist}m</div>`;
+      rp.appendChild(seg);
+    }
+  });
+
+  document.getElementById('myStopInfo').textContent = d<70 ? b.name+' is at your stop!' : fmtD(d)+' away — '+b.name;
+  updateBusList();
+}
+
+function updateBusList() {
+  const list = document.getElementById('busList');
+  const sorted = [...buses].sort((a,b) => distToMyStop(a)-distToMyStop(b));
+  list.innerHTML='';
+  sorted.forEach(b => {
+    const st=getStatus(b), sc=stColor(st), occ=Math.round(b.pax/b.cap*100);
+    const d=distToMyStop(b), eta=etaMins(b);
+    const isSel=selBus&&selBus.id===b.id;
+    const tTag=b.type==='KSRTC'?'tt-k':b.type==='EXPRESS'?'tt-e':'tt-l';
+    const card=document.createElement('div'); card.className='bus-card'+(isSel?' sel':'');
+    const stateHtml = b.atStop
+      ? `<div class="bc-state" style="color:var(--purple)">🚏 Stopped · ${Math.ceil(b.dwellLeft)}s dwell left</div>`
+      : `<div class="bc-state" style="color:var(--muted)">🚌 En route → ${STOPS[nxtSI(b)].name}</div>`;
+    card.innerHTML=`
+      <div class="bc-hdr">
+        <div><span class="bc-name" style="color:${b.color}">${b.name}</span><span class="bc-type-tag ${tTag}">${b.type}</span></div>
+        <span class="badge ${stBadge(st)}">${st}</span>
+      </div>
+      <div class="bc-at">📍 At: <b>${STOPS[curSI(b)].name}</b></div>
+      ${stateHtml}
+      <div class="bc-eta" style="color:${b.color}">${d<70?'🟢 At your stop!':eta+' min away'}</div>
+      <div class="bc-dist">📏 ${d<70?'~0m from you':fmtD(d)+' from you'}</div>
+      <div class="bc-occ-row"><span>${b.pax}/${b.cap} pax</span><span>${occ}%</span></div>
+      <div class="bar-bg"><div class="bar-fg" style="width:${Math.min(occ,100)}%;background:${sc}"></div></div>`;
+    card.onclick=()=>selectBus(b);
+    list.appendChild(card);
+  });
+}
+
+function changeMyStop(idx) {
+  myStop=idx;
+  document.getElementById('myStopName').textContent=STOPS[idx].name;
+  document.getElementById('myStopInfo').textContent='Watching all incoming buses';
+  updateBusList();
+  if(selBus) selectBus(selBus);
+  drawMap();
+}
+
+// ══ MAIN TICK ══
+function tick() {
+  tickBuses();
+  trips++;
+  // Log buses currently at stops
+  buses.forEach(b => {
+    if(b.atStop) {
+      const st=getStatus(b);
+      if(st!=='NORMAL') pushAlert(b,st);
+      pushLog(b,st);
+    }
+  });
+  const avg=Math.round(buses.reduce((s,b)=>s+b.pax/b.cap,0)/buses.length*100);
+  pushChart(avg);
+  renderRoutes();
+  updateKPIs();
+  drawMap();
+  updateBusList();
+  if(selBus){const live=buses.find(x=>x.id===selBus.id);if(live)selBus=live;}
+}
+
+function startSys(){
+  if(running)return; running=true;
+  document.getElementById('btnStart').style.display='none';
+  document.getElementById('btnPause').style.display='inline-block';
+  document.getElementById('pip').classList.add('live');
+  document.getElementById('liveText').textContent='LIVE';
+  document.getElementById('liveText').classList.add('on');
+  mainInt=setInterval(tick,TICK);
+  clockInt=setInterval(()=>document.getElementById('clock').textContent=ts(),1000);
+  tick();
+}
+function pauseSys(){
+  running=false; clearInterval(mainInt); clearInterval(clockInt);
+  document.getElementById('btnStart').style.display='inline-block';
+  document.getElementById('btnPause').style.display='none';
+  document.getElementById('pip').classList.remove('live');
+  document.getElementById('liveText').textContent='PAUSED';
+  document.getElementById('liveText').classList.remove('on');
+}
+function resetSys(){
+  pauseSys();
+  buses=mkBuses(); trips=0; alerts=0; logCount=0; selBus=null;
+  document.getElementById('liveText').textContent='OFFLINE';
+  ['kTrips','kAlerts','kAtStop','hTrips','hAlerts'].forEach(id=>document.getElementById(id).textContent='0');
+  ['kOccD','hOcc'].forEach(id=>document.getElementById(id).textContent='—');
+  document.getElementById('kStatus').textContent='IDLE'; document.getElementById('kStatus').style.color='var(--muted)';
+  document.getElementById('kStatusSub').textContent='press start';
+  document.getElementById('hLoad').textContent='IDLE'; document.getElementById('hLoad').style.color='var(--muted)';
+  document.getElementById('alertFeed').innerHTML='<div data-empty style="padding:20px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:11px">Waiting for stream...</div>';
+  document.getElementById('tripLog').innerHTML='<div data-empty style="padding:20px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:11px">No events yet</div>';
+  document.getElementById('alertCount').textContent='0 alerts';
+  document.getElementById('logCount').textContent='0 events';
+  document.getElementById('dpTitle').textContent='Click any bus on the map or in the sidebar to see details';
+  document.getElementById('dpStats').innerHTML=''; document.getElementById('routeProgress').innerHTML='';
+  document.getElementById('myStopInfo').textContent='Watching all incoming buses';
+  document.getElementById('busList').innerHTML='<div style="padding:18px;color:var(--muted);font-size:11px;font-family:var(--mono)">Press Start to track buses</div>';
+  document.getElementById('clock').textContent='--:--:--';
+  if(chart){chart.data.labels=[];chart.data.datasets.forEach(d=>d.data=[]);chart.update();}
+  renderRoutes(); drawMap();
+}
+
+// ══ TABS ══
+function goTab(id, el){
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('pane-'+id).classList.add('active'); el.classList.add('active');
+  if(id==='map') setTimeout(resizeCanvas,50);
+}
+
+// ══ FEATURE BARS ══
+const feats=[
+  {n:'is_peak_hour',v:40.99},{n:'is_weekend',v:17.62},{n:'occupancy_lag',v:13.90},
+  {n:'hour',v:9.14},{n:'hour_cos',v:8.61},{n:'hour_sin',v:6.89},
+  {n:'temperature_c',v:1.36},{n:'rainfall_mm',v:0.77},{n:'bus_capacity',v:0.45},{n:'route_encoded',v:0.27}
+];
+const fb = document.getElementById('featBars');
+feats.forEach(f=>{
+  fb.innerHTML+=`<div class="feat-row">
+    <span class="feat-name">${f.n}</span>
+    <div class="feat-track"><div class="feat-fill" style="width:${(f.v/41*100).toFixed(1)}%"></div></div>
+    <span class="feat-val">${f.v}%</span></div>`;
+});
+
+// ══ INIT ══
+new ResizeObserver(resizeCanvas).observe(canvas.parentElement);
+resizeCanvas();
+initChart();
+renderRoutes();
+setInterval(()=>document.getElementById('clock').textContent=ts(),1000);
+document.getElementById('clock').textContent=ts();
+</script>
+</body>
+</html>
